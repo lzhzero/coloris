@@ -601,6 +601,15 @@ int fire_timer(void *arg) {
   return 0;
 }
 
+enum hrtimer_restart do_sample(struct hrtimer *timer) {
+
+  ktime_t ktime;
+  sample_stages[smp_processor_id()]++;
+  ktime = ktime_set(SAMPLE_PERIOD, 0);
+  hrtimer_forward_now(timer, ktime);
+  return HRTIMER_RESTART;
+}
+
 /* ioctl entry point, debugging tool */
 int debug_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 
