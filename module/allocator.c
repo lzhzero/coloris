@@ -311,6 +311,7 @@ static int string_eq(char *str1, char *str2) {
 }
 
 
+int fire_timer(void *arg);
 
 /* *********Allocator********* */
 
@@ -534,7 +535,37 @@ static void __exit alloc_cleanup(void) {
   printk(KERN_ERR "Allocator unloaded!\n");
 }
 
+int fire_timer(void *arg) {
 
+  struct cpumask mask;
+  unsigned int cpu = (unsigned int)arg;
+  ktime_t ktime;
+
+  /* pin to cpu */
+  cpumask_clear(&mask);
+  cpumask_set_cpu(cpu, &mask);
+
+  sched_setaffinity(0, &mask);
+
+  /* when next time gets scheduled, runs on designated cpu */
+  while(ipc_apps != nr_apps) schedule();
+
+  if (smp_processor_id() != cpu) {
+    printk(KERN_ERR "Fails to fire timer %d!\n", cpu);
+    return 0;
+  }
+
+  ipc_sig[smp_processor_id()] = 0;
+
+  /* install hrtimer */
+  /* start counting after 1 min */
+  ktime = ktime_set(60, 0);
+  hrtimer_init(&ipc_timer[cpu], CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
+  ipc_timer[cpu].function = ipc_count;
+  hrtimer_start(&ipc_timer[cpu], ktime, HRTIMER_MODE_REL_PINNED);
+
+  return 0;
+}
 
 /* ioctl entry point, debugging tool */
 int debug_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
