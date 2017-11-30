@@ -535,6 +535,40 @@ static void __exit alloc_cleanup(void) {
   printk(KERN_ERR "Allocator unloaded!\n");
 }
 
+enum hrtimer_restart ipc_count(struct hrtimer *timer) {
+
+  ktime_t ktime;
+  int cpu = smp_processor_id();
+
+  if (!ipc_sig[cpu]) {
+    wrmsr(0xC3, 0, 0);
+
+    /* get result after some time */
+    ktime = ktime_set(TEST_TIME, 0);
+    hrtimer_forward_now(timer, ktime);
+    ipc_sig[cpu] = 1;
+
+    /* periodic sampling */
+    ktime = ktime_set(SAMPLE_PERIOD, 0);
+    hrtimer_init(&sample_timer[cpu], CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
+    sample_timer[cpu].function = do_sample;
+    hrtimer_start(&sample_timer[cpu], ktime, HRTIMER_MODE_REL_PINNED);
+
+    printk(KERN_ERR "%s: first stage\n", __func__);
+
+    return HRTIMER_RESTART;
+  }
+  else {
+    hrtimer_cancel(&sample_timer[cpu]);
+
+    ipc_sig[cpu] = 0;
+
+    printk(KERN_ERR "%s: second stage\n", __func__);
+
+    return HRTIMER_NORESTART;
+  }
+}
+
 int fire_timer(void *arg) {
 
   struct cpumask mask;
