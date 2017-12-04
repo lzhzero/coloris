@@ -107,6 +107,9 @@ extern unsigned int sample_stages[NR_CPUS];
 #define COLORS_ONCE 4
 #define COLORS_TRY 4
 
+/*LIU*/
+static struct task_struct *kth_list[NUM_CORES];
+
 struct _Scanner {
   struct hrtimer timer;
   int working;
@@ -469,7 +472,7 @@ static int __init alloc_init(void) {
   assign_colors = get_color_set;
 */
   for (k = 0; k < NUM_CORES; k++)
-    kthread_run(fire_timer, (void *)k, "my thread");
+    kth_list[k] = kthread_run(fire_timer, (void *)k, "my thread");
   
 #ifdef ALLOC_DEBUG
   init_check();
@@ -481,7 +484,10 @@ static int __init alloc_init(void) {
 
 
 static void __exit alloc_cleanup(void) {
-
+  int k;
+  for (k = 0; k < NUM_CORES; k++)
+    kthread_stop(kth_list[k]);
+  
   remove_proc_entry("alloc", NULL);
 
   int i;
@@ -491,15 +497,6 @@ static void __exit alloc_cleanup(void) {
 
   /* unload functions */
   // XXX: synchronization may be needed
-  assign_colors = NULL;
-  recolor_mm = NULL;
-  collect_inst = NULL;
-  finish_recolor = NULL;
-  check_apps = NULL;
-  colored_alloc_file = NULL;
-  colored_alloc = NULL;
-  color_collect = NULL;
-  colored_free = NULL;
 
   /* free memory pool */
   for (i = 0; i < COLOR_NUM; i++) {
